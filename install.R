@@ -1,8 +1,4 @@
-install.packages("tidyverse")
-install.packages("rmarkdown")
-#install.packages("httr")
-#install.packages("shinydashboard")
-#install.packages('leaflet')
+install.packages("BiocManager")
 
 BiocManager::install("DESeq2")
 BiocManager::install("apeglm")
