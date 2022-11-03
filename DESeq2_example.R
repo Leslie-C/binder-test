@@ -35,16 +35,18 @@
 #                               UOUOUOUOUOUOUOUOUOUOUOUOUOUOUOUOUOUOUO                     
 
 
-#install necessary packages
-if (!requireNamespace("BiocManager", quietly = TRUE))
-  install.packages("BiocManager")
-BiocManager::install("DESeq2")
-BiocManager::install("apeglm")
-install.packages("ashr")
-install.packages("ggplot2")
-install.packages("pheatmap")
+#install necessary packages -> Not required if using Binder image
+# if (!requireNamespace("BiocManager", quietly = TRUE))
+#   install.packages("BiocManager")
+# BiocManager::install("DESeq2")
+# BiocManager::install("apeglm")
+# install.packages("ashr")
+# install.packages("ggplot2")
+# install.packages("pheatmap")
 
 library(DESeq2)
+
+#Create table with sample metadata
 directory <- paste(getwd(),"/data/", sep="")
 sampleFiles <- grep("mouse",list.files(directory),value=TRUE)
 sampleCondition1 <- sub("mouse","\\1",sampleFiles)
@@ -54,19 +56,25 @@ type <- sub("*.genecount","\\1",type)
 sampleTable <- data.frame(sampleName=sub("*.\\w+_\\w+.genecount","\\1",sampleCondition1),
                           fileName=sampleFiles,
                           condition=sampleCondition)
+print(sampleTable)
+
+#Import data
 ddsHTSeq <- DESeqDataSetFromHTSeqCount(sampleTable=sampleTable,
                                        directory=directory,
                                        design=~ condition)
+
+#set factor levels
 ddsHTSeq$condition <- factor(ddsHTSeq$condition,
-                             levels = c("Saline","Heptamidine","Furamidine"))
+                             levels = c("Saline","Hept","Furam"))
+#Run DESeq
 dds <- DESeq(ddsHTSeq)
 
-#removes rows with 0 or 1 reads
+#remove rows with 0 or 1 reads
 dds <- dds[rowSums(counts(dds)) > 1, ]
 
 #contrast saline v. treatments
-resHept <- results(dds, contrast=c("condition","Heptamidine","Saline"))
-resFur <- results(dds, contrast=c("condition","Furamidine","Saline"))
+resHept <- results(dds, contrast=c("condition","Hept","Saline"))
+resFur <- results(dds, contrast=c("condition","Furam","Saline"))
 resHeptOrdered <- resHept[order(resHept$padj),]
 resFurOrdered <- resFur[order(resFur$padj),]
 summary(resHeptOrdered)
