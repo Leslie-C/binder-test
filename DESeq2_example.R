@@ -58,7 +58,7 @@ sampleTable <- data.frame(sampleName=sub("*.\\w+_\\w+.genecount","\\1",sampleCon
                           condition=sampleCondition)
 print(sampleTable)
 
-#Import data
+#Import data from HTSeqCount output
 ddsHTSeq <- DESeqDataSetFromHTSeqCount(sampleTable=sampleTable,
                                        directory=directory,
                                        design=~ condition)
@@ -83,7 +83,7 @@ summary(resFurOrdered)
 resHept_shrink <- lfcShrink(dds, contrast=c("condition","heptamidine","saline"),res=resHept, type = "ashr")
 resFur_shrink <- lfcShrink(dds, contrast=c("condition","furamidine","saline"),res=resFur, type = "ashr")
 
-par(mfrow=c(1,1))
+par(mfrow=c(1,2))
 plotMA(resHept_shrink, alpha=0.1, ylim=c(-4.5,4.5), xlim=c(0.1,10000000), main="Heptamidine vs Saline")
 plotMA(resFur_shrink, alpha=0.1, ylim=c(-4.5,4.5), xlim=c(0.1,10000000), main="Furamidine vs Saline")
 
@@ -92,7 +92,17 @@ plotMA(resFur_shrink, alpha=0.1, ylim=c(-4.5,4.5), xlim=c(0.1,10000000), main="F
 #  idx <- identify(resHept$baseMean, resHept$log2FoldChange) #click on plot, esc to exit
 #  rownames(resHept)[idx]
 
-#just playing
+#comparing various normalization methods, more details here: https://bioconductor.org/packages/release/bioc/vignettes/DESeq2/inst/doc/DESeq2.html#moreshrink
+resultsNames(dds)
+par(mfrow=c(1,3))
+H_norm <- lfcShrink(dds, coef=3, type = "normal")
+H_apeglm<- lfcShrink(dds, coef=3, type = "apeglm")
+H_ashr <- lfcShrink(dds, coef=3, type = "ashr")
+plotMA(H_norm, alpha=0.1, ylim=c(-4.5,4.5), xlim=c(0.1,10000000), main="normal")
+plotMA(H_apeglm, alpha=0.1, ylim=c(-4.5,4.5), xlim=c(0.1,10000000), main="apeglm")
+plotMA(H_ashr, alpha=0.1, ylim=c(-4.5,4.5), xlim=c(0.1,10000000), main="ashr")
+
+#Plotting normalized counts of specific genes
 par(mfrow=c(2,2))
 plotCounts(dds, gene = which.min(resHept$padj), intgroup = "condition")
 plotCounts(dds, gene = which.min(resFur$padj), intgroup = "condition")
@@ -107,35 +117,27 @@ ggplot(data_count, aes(x=condition, y=count)) + scale_y_log10() +
 
 #transform values
 rld <- rlog(dds, blind=FALSE)
-vsd <- varianceStabilizingTransformation(dds, blind=FALSE)
-vsd.fast <- vst(dds, blind=FALSE)
-head(assay(rld),3)
-
-#heatmap
-library("pheatmap")
-select <- order(rowMeans(counts(dds,normalized=TRUE)), decreasing=TRUE)[1:20]
-nt <- normTransform(dds)
-log2.norm.counts <- assay(nt)[select,]
-df <- as.data.frame(colData(dds)[,c("condition")])
-sampleDists <- dist(t(assay(rld)))
-library("RColorBrewer")
-sampleDistMatrix <- as.matrix(sampleDists)
-rownames(sampleDistMatrix) <- paste(rld$condition, rld$type, sep="-")
-colnames(sampleDistMatrix) <- NULL
-colors <- colorRampPalette( rev(brewer.pal(9, "Blues")) )(255)
-pheatmap(sampleDistMatrix, clustering_distance_rows=sampleDists, 
-         clustering_distance_cols=sampleDists, col=colors)
 
 #PCA
 library("ggplot2")
 par(mfrow=c(1,1))
 plotPCA(rld, intgroup=c("condition"))
+
+#PCA: with label names
+plotPCA(rld, intgroup=c("condition")) + geom_text(aes(label=name))
+
+#PCA: ggplot
 data <- plotPCA(rld, intgroup=c("condition"), returnData=TRUE)
 percentVar <- round(100 * attr(data, "percentVar"))
 ggplot(data, aes(PC1, PC2, color=condition)) +
   geom_point(size=3) +
   xlab(paste0("PC1: ",percentVar[1],"% variance")) +
-  ylab(paste0("PC2: ",percentVar[2],"% variance"))
+  ylab(paste0("PC2: ",percentVar[2],"% variance")) + 
+  geom_text(aes(label=substring(name,nchar(name))), nudge_x = 1, nudge_y = 1)
+
+#To remove row 6 (hept3) from sample table, paste the next line onto the console without #
+# sampleTable <- sampleTable[-6,]
+#Now re-run starting from line 62
 
 #Comparisons
 sig_fur <- subset(resFurOrdered, resFurOrdered$padj <= 0.1)
@@ -148,3 +150,4 @@ plot(fur_hept$log2FoldChange.fur,fur_hept$log2FoldChange.hept,
 abline(a=0,b=1,col="grey")
 abline(h=0,col="red")
 abline(v=0, col="red")
+
